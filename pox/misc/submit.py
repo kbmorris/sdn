@@ -1,11 +1,11 @@
-'''
+"""
 Coursera:
 - Software Defined Networking (SDN) course
--- Programming Assignment: Layer-2 Firewall Application
+-- Network Virtualization: Network Topology
 
 Professor: Nick Feamster
 Teaching Assistant: Arpit Gupta
-'''
+"""
 
 ### The only things you'll have to edit (unless you're porting this script over to a different language) 
 ### are at the bottom of this file.
@@ -148,51 +148,101 @@ def source(partIdx):
 
 ############ BEGIN ASSIGNMENT SPECIFIC CODE - YOU'LL HAVE TO EDIT THIS ##############
 
-from mininet.net import Mininet                                                           
-from mininet.node import Controller                                                                    
-from mininet.topo import SingleSwitchTopo   
-from mininet.log import setLogLevel
-import os
+import os 
+from mininet.net import Mininet                                                       
+from mininet.node import Controller  
+from mininet.link import TCLink
+from mininet.log import setLogLevel, info
+from mininetSlice import FVTopo
+
+import os, time
+
+
 
 # Make sure you change this string to the last segment of your class URL.
 # For example, if your URL is https://class.coursera.org/pgm-2012-001-staging, set it to "pgm-2012-001-staging".
 URL = 'sdn-002'
 
 # the "Identifier" you used when creating the part
-partIds = ['agPA3']                        
+partIds = ['agPA41', 'agPA42']                        
 # used to generate readable run-time information for students
-partFriendlyNames = ['Create a fully functional layer-2 Firewall application'] 
+partFriendlyNames = ['Topology based slicing', 'Advanced flowspace slicing'] 
 # source files to collect (just for our records)
-sourceFiles = ['%s/pox/pox/misc/firewall.py' % os.environ[ 'HOME' ] ]
+sourceFiles = ['%s/pox/pox/misc/topologySlice.py' % os.environ[ 'HOME' ], 
+               '%s/pox/pox/misc/videoSlice.py' % os.environ[ 'HOME' ] ]
 
-class POXBridge( Controller ):                                                                         
+class TopologySliceController( Controller ):  
+                                                                     
   "Custom Controller class to invoke POX"                                     
   def start( self ):                                                                                 
-    "Start POX learning switch"                                                                    
+    "Start POX Controller"                                                                    
     self.pox = '%s/pox/pox.py' % os.environ[ 'HOME' ]  
-    self.cmd( self.pox, 'forwarding.l2_learning misc.firewall &' )                                               
+    self.cmdPrint( self.pox, 'misc.topologySlice &' )  
+                                                   
   def stop( self ):                                                                                  
     "Stop POX"                                                                                     
-    self.cmd( 'kill %' + self.pox )                      
-          
+    self.cmdPrint( 'kill %' + self.pox )    
+
+    
+class VideoSliceController( Controller ):  
+                                                                     
+  "Custom Controller class to invoke POX"                                     
+  def start( self ):                                                                                 
+    "Start POX Controller"                                                                    
+    self.pox = '%s/pox/pox.py' % os.environ[ 'HOME' ]  
+    self.cmdPrint( self.pox, 'misc.videoSlice &' )  
+                                                   
+  def stop( self ):                                                                                  
+    "Stop POX"                                                                                     
+    self.cmdPrint( 'kill %' + self.pox )                   
+         
+                
+ 
 def output(partIdx):
   """Uses the student code to compute the output for test cases."""
   outputString = ''
   
-  if partIdx == 0: # This is agPA3
+  if partIdx == 0: # This is part1: 
     print "a. Firing up Mininet"
-    net = Mininet( topo=SingleSwitchTopo( 8 ), controller=POXBridge, autoSetMacs=True )                                  
-    net.start()   
+    #setLogLevel('info')
+    topo = FVTopo()
+    net = Mininet( topo=topo, link = TCLink, controller=TopologySliceController, autoSetMacs=True )                                       
+    net.start()          
+    time.sleep(1)
 
-    h3 = net.get('h3')
-    h4 = net.get('h4')
-    h6 = net.get('h6')
-  
     print "b. Starting Test"
     # Start pings
-    outputString += h3.cmd('ping', '-c3', h6.IP())
-    outputString += h4.cmd('ping', '-c3', h6.IP())
+    outputString = str(net.pingAll())
+    print "The output string is: ",outputString
+
     
+    print "c. Stopping Mininet"
+    net.stop()
+    
+  if partIdx == 1: # This is part2: 
+    print "a. Firing up Mininet"
+    #setLogLevel('info')
+    topo = FVTopo()
+    net = Mininet( topo=topo, link = TCLink, controller=VideoSliceController, autoSetMacs=True )                                       
+    net.start()          
+    time.sleep(1)
+
+    print "b. Starting Test"
+    # Start pings
+    net.pingAll()
+    h1 = net.get('h1')
+    h2 = net.get('h2')
+    h3 = net.get('h3')
+    h4 = net.get('h4')
+    
+    # Start the servers
+    h3.cmdPrint('iperf -s -p 80 &')
+    h4.cmdPrint('iperf -s -p 22 &')
+    outputString += h1.cmd('iperf -c 10.0.0.3 -p 80 -t 2 -i 1')
+    outputString += h2.cmd('iperf -c 10.0.0.4 -p 22 -t 2 -i 1')
+    
+    
+    print outputString
     print "c. Stopping Mininet"
     net.stop()
     
